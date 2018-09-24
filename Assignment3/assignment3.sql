@@ -1,7 +1,7 @@
 CREATE DATABASE jmb;
 \c jmb; 
 
-
+-- Actual problems after all these definitions 
 
 CREATE TABLE Student(
 	sid INTEGER PRIMARY KEY,
