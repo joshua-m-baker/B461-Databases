@@ -1,0 +1,167 @@
+-- A
+SELECT m.sid, m.major FROM major m 
+    WHERE m.sid IN (
+        SELECT t.sid FROM buys t, book b
+        WHERE t.bookno = b.bookno 
+        AND b.price < 20);
+
+SELECT m.sid, m.major FROM major m, buys t, book b
+    WHERE t.sid = m.sid 
+    AND t.bookno = b.bookno
+    AND b.price < 20;
+
+
+-- B
+SELECT DISTINCT t.sid, b.bookno FROM buys t, book b
+    WHERE t.bookno = b.bookno 
+    AND b.price <= ALL (
+        SELECT b1.price FROM buys t1, book b1
+        WHERE t1.bookno = b1.bookno 
+        AND t1.sid = t.sid
+    );
+
+SELECT DISTINCT t.sid, b.bookno FROM buys t
+    INNER JOIN Book b ON t.bookno = b.bookno
+    WHERE b.price <= ALL (SELECT bo.price
+        FROM buys bu INNTER JOIN book bo ON
+        bo.bookno = bu.bookno WHERE bo.sid = bu.sid);
+
+SELECT DISTINCT q.sid, q.bookno
+FROM (
+    (SELECT DISTINCT bu.sid, b.bookno FROM buys bu
+        INNER JOIN Book b ON bu.bookno = b.bookno)
+    EXCEPT
+    (SELECT bu.sid, b.bookno FROM buys bu
+        INNER JOIN book b ON bu.bookno = b.bookno,
+        buys bu2 INNTER JOIN book b1 ON bu2.bookno = b1.bookno
+        WHERE bu2.sid = b.sid AND NOT b.price <= b1.price)
+    
+) AS q
+
+-- C)
+SELECT s.sid, s.sname FROM student s
+    WHERE s.sid IN (SELECT m.sid FROM major m WHERE m.major = 'CS') 
+    AND EXISTS (
+        SELECT 1 FROM buys t, cites c, book b1, book b2 
+            WHERE s.sid = t.sid AND 
+            t.bookno = c.citedbookno AND 
+            c.citedbookno = b1.bookno AND 
+            c.bookno = b2.bookno AND 
+            b1.price > b2.price
+);
+
+SELECT s.sid, s.sname FROM student s, (SELECT m.sid FROM major m WHERE m.major = 'CS') cs
+    WHERE s.sid = cs.sid AND EXISTS (
+        SELECT 1 FROM buys t, cites c, book b1, book b2 
+            WHERE s.sid = t.sid AND 
+            t.bookno = c.citedbookno AND 
+            c.citedbookno = b1.bookno AND 
+            c.bookno = b2.bookno AND 
+            b1.price > b2.price
+
+); 
+
+
+SELECT s.sid, s.sname FROM student s, (SELECT m.sid FROM major m WHERE m.major = 'CS') cs,
+    buys t, cites c, book b1, book b2 
+    WHERE s.sid = cs.sid AND 
+            t.bookno = c.citedbookno AND 
+            c.citedbookno = b1.bookno AND 
+            c.bookno = b2.bookno AND 
+            b1.price > b2.price
+); 
+   
+-- D)
+SELECT b.bookno, b.title FROM book b 
+    WHERE EXISTS (
+        SELECT m.sid FROM major m
+            WHERE m.major = 'CS' AND
+            m.sid NOT IN (
+                SELECT t.sid FROM buys t
+                    WHERE t.bookno = b.bookno
+            )
+    );
+
+SELECT b.bookno, b.title FROM book b 
+    WHERE EXISTS (
+        SELECT m.sid, b.bookno FROM major m, book b
+            WHERE m.major='CS'EXCEPT (
+                SELECT t.sid, t.bookno FROM buys t)
+            );       
+
+SELECT DISTINCT b.bookno, b.title FROM book b,
+    (SELECT m.sid, b.bookno FROM major m, book b
+        WHERE m.major='CS' EXCEPT (
+            SELECT t.sid, t.bookno FROM buys t)
+    );
+
+-- E)
+SELECT b.bookno, b.title FROM book b
+    WHERE NOT EXISTS(
+        SELECT s.sid FROM student s 
+            WHERE s.sid IN (
+                SELECT m.sid FROM major m WHERE m.major = 'CS')
+            AND s.sid IN ( 
+                SELECT m.sid FROM major m WHERE m.major = 'MATH')
+            AND s.sid NOT IN (
+                SELECT t.sid FROM buys t where t.bookno = b.bookno)
+    );
+
+-- Remove NOT EXISTS
+SELECT q.bookno, q.title FROM (
+    SELECT b.bookno, b.title FROM book b
+    EXCEPT
+    SELECT b.bookno, b.title FROM book b, student s
+        WHERE s.sid IN (
+            SELECT m.sid FROM major m WHERE m.major = 'CS')
+        AND s.sid IN ( 
+            SELECT m.sid FROM major m WHERE m.major = 'MATH')
+        AND s.sid NOT IN (
+            SELECT t.sid FROM buys t where t.bookno = b.bookno)
+) AS q;
+
+-- Remove IN
+SELECT q.bookno, q.title FROM (
+    SELECT b.bookno, b.title FROM book b
+    EXCEPT
+    SELECT b.bookno, b.title FROM book b, student s, major m1, major m2
+        WHERE s.sid = m.sid AND m1.major = 'CS'
+        AND s.sid = m2.sid AND m2.major = 'Math'
+        AND s.sid NOT IN (
+            SELECT t.sid FROM buys t where t.bookno = b.bookno)
+) AS q;
+
+--Remove ANDs
+SELECT q.bookno, q.title FROM (
+    SELECT b.bookno, b.title FROM book b
+    EXCEPT
+    SELECT b.bookno, b.title FROM book b, student s 
+            INNER JOIN major m1 ON s.sid = m1.sid 
+            INNER JOIN major m2 ON s.sid = m2.sid
+        WHERE m1.major = 'CS' AND m2.major = 'Math'
+        AND s.sid NOT IN (
+            SELECT t.sid FROM buys t where t.bookno = b.bookno)
+) AS q;
+
+-- Remove NOT IN
+SELECT q.bookno, q.title FROM (
+    SELECT b.bookno, b.title FROM book b
+    EXCEPT
+    SELECT a.bookno, a.title FROM (
+        SELECT b.bookno, b.title, s.sid FROM book b, student s 
+            INNER JOIN major m1 ON s.sid = m1.sid 
+            INNER JOIN major m2 ON s.sid = m2.sid
+        WHERE m1.major = 'CS' AND m2.major = 'Math'
+ 
+        EXCEPT(
+        SELECT b.bookno, b.title, s.sid FROM book b, buys t, student s
+            INNER JOIN major m1 ON s.sid = m1.sid 
+            INNER JOIN major m2 ON s.sid = m2.sid
+        WHERE m1.major = 'CS' AND   
+            m2.major = 'Math' AND
+            b.bookno = t.bookno
+        ) 
+    )AS a 
+) AS q;
+
+    
